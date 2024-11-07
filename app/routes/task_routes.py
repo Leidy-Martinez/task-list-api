@@ -1,5 +1,6 @@
 from flask import Blueprint, request, abort, make_response, Response
 from app.models.task import Task
+from datetime import datetime
 from ..db import db
 
 tasks_bp = Blueprint("task_bp", __name__,url_prefix="/tasks")
@@ -111,6 +112,32 @@ def update_one_task_by_id(task_id):
         "is_complete": bool(task.completed_at)
         }
     }
+
+@tasks_bp.patch("/<task_id>/<task_status>")
+def task_status(task_id, task_status):
+    
+    task = validate_task_id(task_id) #record with id = task_id
+
+    # Update task status based on the task_status value
+    if task_status == "mark_complete":
+        task.completed_at =  datetime.now()
+
+    elif task_status == "mark_incomplete":
+        task.completed_at = None # Set to None to indicate incomplete
+    else:
+        # Return error response for invalid task_status
+        return {"error": "Invalid task status provided"}, 400
+        
+    db.session.commit() #save the changes to db
+    return {
+        Task.__tablename__: {
+        "id": task.id,
+        "title": task.title,
+        "description": task.description,
+        "is_complete": bool(task.completed_at)
+        }
+    }
+
 
 @tasks_bp.delete("/<task_id>")
 def delete_task_by_id(task_id):
