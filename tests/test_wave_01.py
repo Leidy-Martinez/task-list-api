@@ -1,5 +1,6 @@
 from app.models.task import Task
 import pytest
+from app.db import db
 
 
 #@pytest.mark.skip(reason="No way to test this feature yet")
@@ -88,7 +89,8 @@ def test_create_task(client):
             "is_complete": False
         }
     }
-    new_task = Task.query.get(1)
+    #new_task = Task.query.get(1)
+    new_task = db.session.get(Task, 1) # Use Session.get() for SQLAlchemy 2.0 compatibility
     assert new_task
     assert new_task.title == "A Brand New Task"
     assert new_task.description == "Test Description"
@@ -115,7 +117,8 @@ def test_update_task(client, one_task):
             "is_complete": False
         }
     }
-    task = Task.query.get(1)
+    #task = Task.query.get(1)
+    task = db.session.get(Task, 1) # Use Session.get() for SQLAlchemy 2.0 compatibility
     assert task.title == "Updated Task Title"
     assert task.description == "Updated Test Description"
     assert task.completed_at == None
@@ -154,7 +157,8 @@ def test_delete_task(client, one_task):
     assert response_body == {
         "details": 'Task 1 "Go on my daily walk 🏞" successfully deleted'
     }
-    assert Task.query.get(1) == None
+    #assert Task.query.get(1) == None
+    assert db.session.get(Task, 1) == None # Use Session.get() for SQLAlchemy 2.0 compatibility
 
 
 #@pytest.mark.skip(reason="No way to test this feature yet")

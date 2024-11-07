@@ -36,6 +36,20 @@ def create_task():
 def get_all_tasks():
     #execute the query statement and retrieve the models
     query = db.select(Task) #select records from db Model
+
+    # Check for sorting parameter and apply
+    sorting_param = request.args.get("sort", "asc").lower() #asc is default if not provided
+    
+    # If sort=desc, order by title descending
+    if sorting_param.lower() == "desc":
+        query = query.order_by(Task.title.desc())
+    else:
+        query = query.order_by(Task.title)
+    # else:
+    #     # No sorting parameter provided, default to ordering by id
+    #     query = query.order_by(Task.id)
+    
+    #query = query.order_by(Task.id)#select records
     tasks = db.session.scalars(query) #retrieve the records
     
     response = []
