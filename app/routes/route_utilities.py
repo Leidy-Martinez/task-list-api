@@ -37,7 +37,7 @@ def get_models_with_filters(cls, filters=None):
     return models_response
 
 def send_slack_message(message):
-    """Sends a message to the Slack channel using the Slack API."""
+    # Sends a message to the Slack channel using the Slack API.
 
     headers = {
         "Authorization": f"Bearer {SLACK_TOKEN}",

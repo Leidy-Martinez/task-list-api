@@ -12,14 +12,14 @@ class Goal(db.Model):
 
     @classmethod
     def from_dict(cls, data):
-        """Creates a Task instance from a dictionary"""
+        # Creates a Task instance from a dictionary
         
         return cls(
             title=data["title"],
         )
 
     def to_dict(self, include_name=True, tasks_ids=False):
-        """Converts a Task instance to a dictionary"""
+        # Converts a Task instance to a dictionary
         goal_dict = {
 
             "id": self.id,
