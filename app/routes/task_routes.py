@@ -1,126 +1,84 @@
 from flask import Blueprint, request, abort, make_response, Response
 from app.models.task import Task
 from datetime import datetime
+from app.routes.route_utilities import validate_model
 from ..db import db
+from app.routes.route_utilities import send_slack_message
 
-tasks_bp = Blueprint("task_bp", __name__,url_prefix="/tasks")
+bp = Blueprint("task_bp", __name__,url_prefix="/tasks")
 
-@tasks_bp.post("")
+@bp.post("")
 def create_task():
     request_body = request.get_json() 
 
-    # Check if "title" or "description" keys are missing in the request body
-    if "title" not in request_body or "description" not in request_body:
-        return {"details": "Invalid data"}, 400
-
-    title = request_body["title"]
-    description = request_body["description"]
-    completed_at = request_body.get("completed_at") # Use .get() since "completed_at" is optional
-    
-    new_task = Task(title=title, description=description, completed_at=completed_at)
+    try:
+        new_task = Task.from_dict(request_body)
+    except:
+        response = {"details": "Invalid data"}
+        abort(make_response(response, 400))
 
     db.session.add(new_task)
     db.session.commit()
 
-    response = {
-        Task.__tablename__: 
-            {
-            "id": new_task.id,
-            "title": new_task.title,
-            "description": new_task.description,
-            "is_complete": bool(new_task.completed_at) # Convert to boolean for completeness
-        }
-            }
-    return response, 201
+    return new_task.to_dict(), 201
 
-@tasks_bp.get("")
+@bp.get("")
 def get_all_tasks():
-    #execute the query statement and retrieve the models
+
     query = db.select(Task) #select records from db Model
 
     # Check for sorting parameter and apply
-    sorting_param = request.args.get("sort", "asc").lower() #asc is default if not provided
+    sorting_param = request.args.get("sort", "asc")
     
-    # If sort=desc, order by title descending
-    if sorting_param.lower() == "desc":
+    if sorting_param == "desc":
         query = query.order_by(Task.title.desc())
     else:
         query = query.order_by(Task.title)
-    # else:
-    #     # No sorting parameter provided, default to ordering by id
-    #     query = query.order_by(Task.id)
-    
+
     #query = query.order_by(Task.id)#select records
     tasks = db.session.scalars(query) #retrieve the records
     
-    response = []
+    response =[]
     for task in tasks:
-        response.append(
-            {
-                "id": task.id,
-                "title": task.title,
-                "description": task.description,
-                "is_complete": bool(task.completed_at)
-            }
-        )
+        response.append(task.to_dict(include_name=False))
     return response 
 
-@tasks_bp.get("/<task_id>")
+@bp.get("/<task_id>")
 def get_one_task_by_id(task_id):
-    task = validate_task_id(task_id)
 
-    return {
-        Task.__tablename__: {
-        "id": task.id,
-        "title": task.title,
-        "description": task.description,
-        "is_complete": bool(task.completed_at)
-        }
-    }
+    task = validate_model(Task,task_id)
 
-def validate_task_id(task_id):
-    try:
-        task_id = int(task_id)
-    except:
-        response = {"message": f"Task {task_id} invalid"}
-        abort(make_response(response, 400))
+    if task.goal_id:
+        return task.to_dict(goal_id=True)
+    else:
+        return task.to_dict()
 
-    #execute the query statement and retrieve the models
-    query = db.select(Task).where(Task.id == task_id) #select records with an id = task_id
-    task = db.session.scalar(query) #retrieve only one record task_id
-    
-    if not task:
-        response = {"message": f"Task {task_id} not found"}
-        abort(make_response(response, 404))
-
-    return task
-
-@tasks_bp.put("/<task_id>")
+@bp.put("/<task_id>")
 def update_one_task_by_id(task_id):
-    task = validate_task_id(task_id) #record with id = task_id
-    request_body = request.get_json()
 
+    task = validate_model(Task,task_id) #record with id = task_id
+    request_body = request.get_json()
+    
+    #Update the task
     task.title = request_body["title"]
     task.description = request_body["description"]
+
     db.session.commit() #save the changes to db
 
-    return {
-        Task.__tablename__: {
-        "id": task.id,
-        "title": task.title,
-        "description": task.description,
-        "is_complete": bool(task.completed_at)
-        }
-    }
+    return task.to_dict()
 
-@tasks_bp.patch("/<task_id>/<task_status>")
+@bp.patch("/<task_id>/<task_status>")
 def task_status(task_id, task_status):
     
-    task = validate_task_id(task_id) #record with id = task_id
+    task = validate_model(Task,task_id) #record with id = task_id
 
     # Update task status based on the task_status value
     if task_status == "mark_complete":
         task.completed_at =  datetime.now()
+
+        
+        # Send Slack notification
+        send_slack_message(f"Someone just completed the task '{task.title}'")
 
     elif task_status == "mark_incomplete":
         task.completed_at = None # Set to None to indicate incomplete
@@ -129,19 +87,12 @@ def task_status(task_id, task_status):
         return {"error": "Invalid task status provided"}, 400
         
     db.session.commit() #save the changes to db
-    return {
-        Task.__tablename__: {
-        "id": task.id,
-        "title": task.title,
-        "description": task.description,
-        "is_complete": bool(task.completed_at)
-        }
-    }
+    return task.to_dict()
 
 
-@tasks_bp.delete("/<task_id>")
+@bp.delete("/<task_id>")
 def delete_task_by_id(task_id):
-    task = validate_task_id(task_id)
+    task = validate_model(Task,task_id)
     
     #Delete the task
     db.session.delete(task)
